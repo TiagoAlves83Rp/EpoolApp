@@ -150,14 +150,14 @@ export default function ClientesPage() {
         .replace(/(\d{3})(\d)/, '$1.$2')
         .replace(/(\d{3})(\d{1,2})$/, '$1-$2')
         .slice(0, 14)
-    } else {
-      return v
-        .replace(/^(\d{2})(\d)/, '$1.$2')
-        .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
-        .replace(/\.(\d{3})(\d)/, '.$1/$2')
-        .replace(/(\d{4})(\d)/, '$1-$2')
-        .slice(0, 18)
     }
+
+    return v
+      .replace(/^(\d{2})(\d)/, '$1.$2')
+      .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+      .replace(/\.(\d{3})(\d)/, '.$1/$2')
+      .replace(/(\d{4})(\d)/, '$1-$2')
+      .slice(0, 18)
   }
 
   function moedaParaNumero(v: string) {
@@ -189,6 +189,8 @@ export default function ClientesPage() {
     const payload = {
       ...form,
       empresa_id: empresaId,
+      data_inicio: form.data_inicio || null,
+      data_ultimo_pagamento: form.data_ultimo_pagamento || null,
       dia_vencimento: Number(form.dia_vencimento),
       valor_mensalidade: moedaParaNumero(form.valor_mensalidade)
     }
@@ -219,7 +221,7 @@ export default function ClientesPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-bold mb-4">Clientes</h1>
+      <h1 className="text-lg font-bold mb-4">Clientes</h1>
 
       <div className="flex gap-2 mb-4">
         <input
@@ -231,7 +233,7 @@ export default function ClientesPage() {
 
         <button
           onClick={() => abrirModal()}
-          className="bg-blue-600 text-white px-4 rounded"
+          className="bg-blue-600 text-white px-3 text-sm rounded"
         >
           Novo
         </button>
@@ -241,26 +243,27 @@ export default function ClientesPage() {
         {lista.map(c => (
           <div
             key={c.id}
-            className="bg-white p-4 rounded shadow flex justify-between"
+            className="bg-white p-3 rounded shadow flex justify-between"
           >
-            <div>
-              <strong>{c.nome}</strong>
-              <p className="text-sm">{c.telefone}</p>
+            <div className="min-w-0">
+              <strong className="text-sm break-words">{c.nome}</strong>
+
+              <p className="text-xs">{c.telefone}</p>
 
               <p className="text-xs text-gray-500">
                 Vence todo dia {c.dia_vencimento}
               </p>
 
-              <p className="text-xs">
+              <p className="text-xs break-words">
                 R$ {c.valor_mensalidade || 0}
               </p>
 
               <p
-                className={
+                className={`text-xs ${
                   c.status === 'ativo'
                     ? 'text-green-600'
                     : 'text-red-600'
-                }
+                }`}
               >
                 {c.status}
               </p>
@@ -268,7 +271,7 @@ export default function ClientesPage() {
 
             <button
               onClick={() => abrirModal(c)}
-              className="bg-blue-700 text-white px-3 py-1 rounded text-xs"
+              className="bg-blue-700 text-white px-2 py-1 rounded text-xs h-fit"
             >
               Detalhes
             </button>
@@ -277,22 +280,23 @@ export default function ClientesPage() {
       </div>
 
       {modal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white p-4 rounded w-[560px] max-h-[90vh] overflow-y-auto">
-            <h2 className="font-bold mb-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2">
+          <div className="bg-white p-3 rounded w-full max-w-[560px] max-h-[90vh] overflow-y-auto">
+
+            <h2 className="font-bold mb-3 text-sm">
               {editando ? 'Editar Cliente' : 'Novo Cliente'}
             </h2>
 
             {erro && (
-              <div className="bg-red-100 text-red-700 p-2 rounded mb-3 text-sm">
+              <div className="bg-red-100 text-red-700 p-2 rounded mb-3 text-xs break-words">
                 {erro}
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
 
               <div>
-                <label className="text-sm">Data de Início *</label>
+                <label className="text-xs">Data de Início *</label>
 
                 <input
                   type="date"
@@ -312,7 +316,7 @@ export default function ClientesPage() {
               </div>
 
               <div>
-                <label className="text-sm">Tipo</label>
+                <label className="text-xs">Tipo</label>
 
                 <select
                   value={form.tipo_documento}
@@ -331,7 +335,7 @@ export default function ClientesPage() {
               </div>
 
               <div>
-                <label className="text-sm">Documento *</label>
+                <label className="text-xs">Documento *</label>
 
                 <input
                   value={form.documento}
@@ -353,7 +357,7 @@ export default function ClientesPage() {
               </div>
 
               <div>
-                <label className="text-sm">Nome *</label>
+                <label className="text-xs">Nome *</label>
 
                 <input
                   value={form.nome}
@@ -372,7 +376,7 @@ export default function ClientesPage() {
               </div>
 
               <div>
-                <label className="text-sm">Telefone *</label>
+                <label className="text-xs">Telefone *</label>
 
                 <input
                   value={form.telefone}
@@ -391,7 +395,7 @@ export default function ClientesPage() {
               </div>
 
               <div>
-                <label className="text-sm">Dia de Vencimento *</label>
+                <label className="text-xs">Dia de Vencimento *</label>
 
                 <input
                   type="number"
@@ -411,7 +415,7 @@ export default function ClientesPage() {
               </div>
 
               <div>
-                <label className="text-sm">Mensalidade</label>
+                <label className="text-xs">Mensalidade</label>
 
                 <input
                   value={form.valor_mensalidade}
@@ -426,7 +430,7 @@ export default function ClientesPage() {
               </div>
 
               <div>
-                <label className="text-sm">Cidade *</label>
+                <label className="text-xs">Cidade *</label>
 
                 <input
                   value={form.cidade}
@@ -445,7 +449,7 @@ export default function ClientesPage() {
               </div>
 
               <div>
-                <label className="text-sm">UF *</label>
+                <label className="text-xs">UF *</label>
 
                 <input
                   value={form.uf}
@@ -480,14 +484,14 @@ export default function ClientesPage() {
             <div className="flex justify-end gap-2 mt-4">
               <button
                 onClick={() => setModal(false)}
-                className="bg-gray-400 px-4 py-2 rounded"
+                className="bg-gray-400 px-3 py-1.5 rounded text-sm"
               >
                 Cancelar
               </button>
 
               <button
                 onClick={salvar}
-                className="bg-blue-600 text-white px-4 py-2 rounded"
+                className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm"
               >
                 {loading ? 'Salvando...' : 'Salvar'}
               </button>

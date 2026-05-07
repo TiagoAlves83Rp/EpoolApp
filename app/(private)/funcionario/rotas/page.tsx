@@ -84,16 +84,49 @@ export default function FuncionarioPage() {
   }
 
   async function checkIn(clienteId: string) {
-    const visita = visitas.find(v => v.cliente_id === clienteId)
-    if (!visita) return
+    const hoje = new Date().toISOString().split('T')[0]
 
-    await supabase
-      .from('visitas_registro')
-      .update({
-        status: 'em_atendimento',
-        checkin_at: new Date().toISOString()
-      })
-      .eq('id', visita.id)
+    let visita = visitas.find(v => v.cliente_id === clienteId)
+
+    // 🔥 SE NÃO EXISTIR VISITA, CRIA
+    if (!visita) {
+      const { error } = await supabase
+        .from('visitas_registro')
+        .insert([
+          {
+            rota_id: rota.id,
+            cliente_id: clienteId,
+            funcionario_id: funcionario.id,
+            empresa_id: funcionario.empresa_id,
+            data_execucao: hoje,
+            status: 'em_atendimento',
+            checkin_at: new Date().toISOString()
+          }
+        ])
+
+      if (error) {
+        console.error(error)
+        alert('Erro ao fazer check-in')
+        return
+      }
+
+    } else {
+
+      // 🔥 SE JÁ EXISTE, APENAS ATUALIZA
+      const { error } = await supabase
+        .from('visitas_registro')
+        .update({
+          status: 'em_atendimento',
+          checkin_at: new Date().toISOString()
+        })
+        .eq('id', visita.id)
+
+      if (error) {
+        console.error(error)
+        alert('Erro ao fazer check-in')
+        return
+      }
+    }
 
     carregarDados()
   }
