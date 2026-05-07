@@ -10,7 +10,7 @@ export default function ClientesPage() {
   const [editando, setEditando] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [erro, setErro] = useState('')
-  const [empresaId, setEmpresaId] = useState<string | null>(null) // ✅
+  const [empresaId, setEmpresaId] = useState<string | null>(null)
 
   const [form, setForm] = useState<any>({
     nome: '',
@@ -63,7 +63,7 @@ export default function ClientesPage() {
     let query = supabase
       .from('clientes')
       .select('*')
-      .eq('empresa_id', empresaId) // ✅ FILTRO ADICIONADO
+      .eq('empresa_id', empresaId)
 
     if (busca) {
       query = query.ilike('nome', `%${busca}%`)
@@ -78,8 +78,18 @@ export default function ClientesPage() {
 
     if (c) {
       setEditando(c)
+
       setForm({
         ...c,
+
+        data_inicio: c.data_inicio
+          ? c.data_inicio.split('T')[0]
+          : '',
+
+        data_ultimo_pagamento: c.data_ultimo_pagamento
+          ? c.data_ultimo_pagamento.split('T')[0]
+          : '',
+
         valor_mensalidade: c.valor_mensalidade
           ? Number(c.valor_mensalidade).toLocaleString('pt-BR', {
               style: 'currency',
@@ -89,6 +99,7 @@ export default function ClientesPage() {
       })
     } else {
       setEditando(null)
+
       setForm({
         nome: '',
         telefone: '',
@@ -177,7 +188,7 @@ export default function ClientesPage() {
 
     const payload = {
       ...form,
-      empresa_id: empresaId, // ✅ IMPORTANTE PRA NÃO MISTURAR EMPRESAS
+      empresa_id: empresaId,
       dia_vencimento: Number(form.dia_vencimento),
       valor_mensalidade: moedaParaNumero(form.valor_mensalidade)
     }
@@ -215,7 +226,7 @@ export default function ClientesPage() {
           value={busca}
           onChange={e => setBusca(e.target.value)}
           placeholder="Buscar cliente..."
-          className="border p-2 w-full"
+          className="border p-1.5 text-sm w-full rounded"
         />
 
         <button
@@ -228,8 +239,10 @@ export default function ClientesPage() {
 
       <div className="space-y-2">
         {lista.map(c => (
-          <div key={c.id} className="bg-white p-4 rounded shadow flex justify-between">
-
+          <div
+            key={c.id}
+            className="bg-white p-4 rounded shadow flex justify-between"
+          >
             <div>
               <strong>{c.nome}</strong>
               <p className="text-sm">{c.telefone}</p>
@@ -242,7 +255,13 @@ export default function ClientesPage() {
                 R$ {c.valor_mensalidade || 0}
               </p>
 
-              <p className={c.status === 'ativo' ? 'text-green-600' : 'text-red-600'}>
+              <p
+                className={
+                  c.status === 'ativo'
+                    ? 'text-green-600'
+                    : 'text-red-600'
+                }
+              >
                 {c.status}
               </p>
             </div>
@@ -253,16 +272,13 @@ export default function ClientesPage() {
             >
               Detalhes
             </button>
-
           </div>
         ))}
       </div>
 
       {modal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
-
-          <div className="bg-white p-6 rounded w-[700px]">
-
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white p-4 rounded w-[560px] max-h-[90vh] overflow-y-auto">
             <h2 className="font-bold mb-4">
               {editando ? 'Editar Cliente' : 'Novo Cliente'}
             </h2>
@@ -276,19 +292,38 @@ export default function ClientesPage() {
             <div className="grid grid-cols-2 gap-3">
 
               <div>
-                <label>Data de Início *</label>
-                <input type="date"
+                <label className="text-sm">Data de Início *</label>
+
+                <input
+                  type="date"
                   value={form.data_inicio}
-                  onChange={e => setForm({ ...form, data_inicio: e.target.value })}
-                  className={`border p-2 w-full ${!form.data_inicio && erro ? 'border-red-500' : ''}`} />
+                  onChange={e =>
+                    setForm({
+                      ...form,
+                      data_inicio: e.target.value
+                    })
+                  }
+                  className={`border p-1.5 text-sm w-full rounded ${
+                    !form.data_inicio && erro
+                      ? 'border-red-500'
+                      : ''
+                  }`}
+                />
               </div>
 
               <div>
-                <label>Tipo</label>
+                <label className="text-sm">Tipo</label>
+
                 <select
                   value={form.tipo_documento}
-                  onChange={e => setForm({ ...form, tipo_documento: e.target.value, documento: '' })}
-                  className="border p-2 w-full"
+                  onChange={e =>
+                    setForm({
+                      ...form,
+                      tipo_documento: e.target.value,
+                      documento: ''
+                    })
+                  }
+                  className="border p-1.5 text-sm w-full rounded"
                 >
                   <option value="CPF">CPF</option>
                   <option value="CNPJ">CNPJ</option>
@@ -296,60 +331,136 @@ export default function ClientesPage() {
               </div>
 
               <div>
-                <label>Documento *</label>
+                <label className="text-sm">Documento *</label>
+
                 <input
                   value={form.documento}
                   onChange={e =>
                     setForm({
                       ...form,
-                      documento: formatDocumento(e.target.value, form.tipo_documento)
+                      documento: formatDocumento(
+                        e.target.value,
+                        form.tipo_documento
+                      )
                     })
                   }
-                  className={`border p-2 w-full ${!form.documento && erro ? 'border-red-500' : ''}`}
+                  className={`border p-1.5 text-sm w-full rounded ${
+                    !form.documento && erro
+                      ? 'border-red-500'
+                      : ''
+                  }`}
                 />
               </div>
 
               <div>
-                <label>Nome *</label>
-                <input value={form.nome}
-                  onChange={e => setForm({ ...form, nome: e.target.value })}
-                  className={`border p-2 w-full ${!form.nome && erro ? 'border-red-500' : ''}`} />
+                <label className="text-sm">Nome *</label>
+
+                <input
+                  value={form.nome}
+                  onChange={e =>
+                    setForm({
+                      ...form,
+                      nome: e.target.value
+                    })
+                  }
+                  className={`border p-1.5 text-sm w-full rounded ${
+                    !form.nome && erro
+                      ? 'border-red-500'
+                      : ''
+                  }`}
+                />
               </div>
 
               <div>
-                <label>Telefone *</label>
-                <input value={form.telefone}
-                  onChange={e => setForm({ ...form, telefone: formatTelefone(e.target.value) })}
-                  className={`border p-2 w-full ${!form.telefone && erro ? 'border-red-500' : ''}`} />
+                <label className="text-sm">Telefone *</label>
+
+                <input
+                  value={form.telefone}
+                  onChange={e =>
+                    setForm({
+                      ...form,
+                      telefone: formatTelefone(e.target.value)
+                    })
+                  }
+                  className={`border p-1.5 text-sm w-full rounded ${
+                    !form.telefone && erro
+                      ? 'border-red-500'
+                      : ''
+                  }`}
+                />
               </div>
 
               <div>
-                <label>Dia de Vencimento *</label>
-                <input type="number"
+                <label className="text-sm">Dia de Vencimento *</label>
+
+                <input
+                  type="number"
                   value={form.dia_vencimento}
-                  onChange={e => setForm({ ...form, dia_vencimento: e.target.value })}
-                  className={`border p-2 w-full ${!form.dia_vencimento && erro ? 'border-red-500' : ''}`} />
+                  onChange={e =>
+                    setForm({
+                      ...form,
+                      dia_vencimento: e.target.value
+                    })
+                  }
+                  className={`border p-1.5 text-sm w-full rounded ${
+                    !form.dia_vencimento && erro
+                      ? 'border-red-500'
+                      : ''
+                  }`}
+                />
               </div>
 
               <div>
-                <label>Mensalidade</label>
-                <input value={form.valor_mensalidade}
-                  onChange={e => setForm({ ...form, valor_mensalidade: formatMoeda(e.target.value) })}
-                  className="border p-2 w-full" />
+                <label className="text-sm">Mensalidade</label>
+
+                <input
+                  value={form.valor_mensalidade}
+                  onChange={e =>
+                    setForm({
+                      ...form,
+                      valor_mensalidade: formatMoeda(e.target.value)
+                    })
+                  }
+                  className="border p-1.5 text-sm w-full rounded"
+                />
               </div>
 
               <div>
-                <label>Cidade *</label>
-                <input value={form.cidade}
-                  onChange={e => setForm({ ...form, cidade: e.target.value })}
-                  className={`border p-2 w-full ${!form.cidade && erro ? 'border-red-500' : ''}`} />
+                <label className="text-sm">Cidade *</label>
+
+                <input
+                  value={form.cidade}
+                  onChange={e =>
+                    setForm({
+                      ...form,
+                      cidade: e.target.value
+                    })
+                  }
+                  className={`border p-1.5 text-sm w-full rounded ${
+                    !form.cidade && erro
+                      ? 'border-red-500'
+                      : ''
+                  }`}
+                />
               </div>
 
               <div>
-                <label>UF *</label>
-                <input value={form.uf}
-                  onChange={e => setForm({ ...form, uf: e.target.value })}
-                  className={`border p-2 w-full ${!form.uf && erro ? 'border-red-500' : ''}`} />
+                <label className="text-sm">UF *</label>
+
+                <input
+                  value={form.uf}
+                  onChange={e =>
+                    setForm({
+                      ...form,
+                      uf: e.target.value
+                    })
+                  }
+                  className={`border p-1.5 text-sm w-full rounded ${
+                    !form.uf && erro
+                      ? 'border-red-500'
+                      : ''
+                  }`}
+                />
               </div>
 
             </div>
@@ -357,22 +468,32 @@ export default function ClientesPage() {
             <textarea
               placeholder="Anotações"
               value={form.anotacoes}
-              onChange={e => setForm({ ...form, anotacoes: e.target.value })}
-              className="border p-2 w-full mt-3 h-24"
+              onChange={e =>
+                setForm({
+                  ...form,
+                  anotacoes: e.target.value
+                })
+              }
+              className="border p-1.5 text-sm w-full mt-3 h-20 rounded"
             />
 
             <div className="flex justify-end gap-2 mt-4">
-              <button onClick={() => setModal(false)} className="bg-gray-400 px-4 py-2 rounded">
+              <button
+                onClick={() => setModal(false)}
+                className="bg-gray-400 px-4 py-2 rounded"
+              >
                 Cancelar
               </button>
 
-              <button onClick={salvar} className="bg-blue-600 text-white px-4 py-2 rounded">
+              <button
+                onClick={salvar}
+                className="bg-blue-600 text-white px-4 py-2 rounded"
+              >
                 {loading ? 'Salvando...' : 'Salvar'}
               </button>
             </div>
 
           </div>
-
         </div>
       )}
     </div>
