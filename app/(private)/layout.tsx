@@ -90,6 +90,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <Link href="/admin/clientes" className="p-2 hover:bg-blue-700 rounded transition">Clientes</Link>
           <Link href="/admin/funcionarios" className="p-2 hover:bg-blue-700 rounded transition">Funcionários</Link>
           <Link href="/admin/rotas" className="p-2 hover:bg-blue-700 rounded transition">Rotas</Link>
+          <Link href="/admin/historico" className="p-2 hover:bg-blue-700 rounded transition">Histórico</Link>
         </>
       )}
 
