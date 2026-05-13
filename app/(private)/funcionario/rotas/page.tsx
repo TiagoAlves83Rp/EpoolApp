@@ -3,23 +3,30 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 
-// 🔥 upload helper
+// 🔥 upload helper - CORRIGIDO PARA RETORNAR URL COMPLETA
 async function uploadFoto(file: File) {
-  const fileName = `${Date.now()}-${file.name}`
+  // 1. Limpa o nome do arquivo
+  const nomeLimpo = file.name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/[^a-zA-Z0-9.-]/g, '')
 
+  const fileName = `${Date.now()}-${nomeLimpo}`
+
+  // 2. Faz o upload para o bucket
   const { error } = await supabase.storage
     .from('visitas')
     .upload(fileName, file)
 
-  if (error) {
-    console.error(error)
-    throw new Error('Erro ao enviar foto')
-  }
+  if (error) throw new Error('Erro ao enviar foto')
 
+  // 3. 🔥 PEGA A URL COMPLETA (Isso resolve o erro 404)
   const { data } = supabase.storage
     .from('visitas')
     .getPublicUrl(fileName)
 
+  // Agora ele retorna https://.../visitas/foto.jpg em vez de apenas foto.jpg
   return data.publicUrl
 }
 
@@ -40,7 +47,6 @@ export default function FuncionarioPage() {
   async function carregarDados() {
     const { data: userData } = await supabase.auth.getUser()
     const user = userData.user
-
     if (!user) return
 
     const { data: func } = await supabase
@@ -50,7 +56,6 @@ export default function FuncionarioPage() {
       .single()
 
     if (!func) return
-
     setFuncionario(func)
 
     const { data: rotaData } = await supabase
@@ -60,7 +65,6 @@ export default function FuncionarioPage() {
       .single()
 
     if (!rotaData) return
-
     setRota(rotaData)
 
     const { data: clientesRota } = await supabase
@@ -72,7 +76,6 @@ export default function FuncionarioPage() {
     setClientes(lista)
 
     const hoje = new Date().toISOString().split('T')[0]
-
     const { data: visitasData } = await supabase
       .from('visitas_registro')
       .select('*')
@@ -85,34 +88,22 @@ export default function FuncionarioPage() {
 
   async function checkIn(clienteId: string) {
     const hoje = new Date().toISOString().split('T')[0]
-
     let visita = visitas.find(v => v.cliente_id === clienteId)
 
-    // 🔥 SE NÃO EXISTIR VISITA, CRIA
     if (!visita) {
       const { error } = await supabase
         .from('visitas_registro')
-        .insert([
-          {
-            rota_id: rota.id,
-            cliente_id: clienteId,
-            funcionario_id: funcionario.id,
-            empresa_id: funcionario.empresa_id,
-            data_execucao: hoje,
-            status: 'em_atendimento',
-            checkin_at: new Date().toISOString()
-          }
-        ])
-
-      if (error) {
-        console.error(error)
-        alert('Erro ao fazer check-in')
-        return
-      }
-
+        .insert([{
+          rota_id: rota.id,
+          cliente_id: clienteId,
+          funcionario_id: funcionario.id,
+          empresa_id: funcionario.empresa_id,
+          data_execucao: hoje,
+          status: 'em_atendimento',
+          checkin_at: new Date().toISOString()            
+        }])
+      if (error) return alert('Erro ao fazer check-in')
     } else {
-
-      // 🔥 SE JÁ EXISTE, APENAS ATUALIZA
       const { error } = await supabase
         .from('visitas_registro')
         .update({
@@ -120,41 +111,19 @@ export default function FuncionarioPage() {
           checkin_at: new Date().toISOString()
         })
         .eq('id', visita.id)
-
-      if (error) {
-        console.error(error)
-        alert('Erro ao fazer check-in')
-        return
-      }
+      if (error) return alert('Erro ao fazer check-in')
     }
-
     carregarDados()
   }
 
   async function checkOut(clienteId: string) {
     const visita = visitas.find(v => v.cliente_id === clienteId)
-
-    if (!visita) return
-
-    if (visita.status !== 'em_atendimento') {
-      alert('Faça o check-in primeiro')
-      return
-    }
-
-    // 🔥 VALIDAÇÃO
-    if (fotos.length < 2) {
-      alert('Envie no mínimo 2 fotos')
-      return
-    }
-
-    if (!observacao) {
-      alert('Preencha a observação')
-      return
-    }
+    if (!visita || visita.status !== 'em_atendimento') return
+    if (fotos.length < 2) return alert('Envie no mínimo 2 fotos')
+    if (!observacao) return alert('Preencha a observação')
 
     try {
       const urls: string[] = []
-
       for (const foto of fotos) {
         const url = await uploadFoto(foto)
         urls.push(url)
@@ -171,14 +140,10 @@ export default function FuncionarioPage() {
         .eq('id', visita.id)
 
       if (error) throw error
-
       alert('Checkout realizado')
-
       setFotos([])
       setObservacao('')
-
       carregarDados()
-
     } catch (err) {
       console.error(err)
       alert('Erro no checkout')
@@ -192,68 +157,45 @@ export default function FuncionarioPage() {
   return (
     <div>
       <h1 className="text-xl font-bold mb-4">Minha Rota</h1>
-
       {!rota && <p>Nenhuma rota atribuída</p>}
-
       {rota && (
         <>
           <h2 className="mb-3">Rota: {rota.nome}</h2>
-
           <ul className="space-y-3">
             {clientes.map(c => {
               const status = getStatus(c.id)
-
               return (
                 <li key={c.id} className="bg-white p-3 rounded shadow">
-
                   <div className="flex justify-between">
                     <span>{c.nome} - {status}</span>
                   </div>
-
                   {status === 'pendente' && (
-                    <button
-                      onClick={() => checkIn(c.id)}
-                      className="bg-yellow-500 text-white px-2 py-1 rounded mt-2"
-                    >
+                    <button onClick={() => checkIn(c.id)} className="bg-yellow-500 text-white px-2 py-1 rounded mt-2">
                       Check-in
                     </button>
                   )}
-
                   {status === 'em_atendimento' && (
                     <>
-                      <input
-                        type="file"
-                        multiple
-                        accept="image/*"
-                        className="mt-2"
-                        onChange={(e) => {
-                          if (!e.target.files) return
-                          setFotos(Array.from(e.target.files))
-                        }}
-                      />
-
-                      <textarea
-                        placeholder="Observação obrigatória"
-                        className="border p-2 w-full mt-2"
-                        value={observacao}
-                        onChange={(e) => setObservacao(e.target.value)}
-                      />
-
-                      <button
-                        onClick={() => checkOut(c.id)}
-                        className="bg-green-600 text-white px-2 py-1 rounded mt-2"
-                      >
+                      <input type="file" accept="image/*" className="mt-2" onChange={(e) => {
+                        if (!e.target.files?.[0]) return
+                        setFotos(prev => [...prev, e.target.files![0]])
+                      }} />
+                      <div className="mt-2 space-y-1">
+                        {fotos.map((foto, index) => (
+                          <div key={index} className="flex justify-between items-center bg-gray-100 p-2 rounded text-sm">
+                            <span className="truncate">{foto.name}</span>
+                            <button onClick={() => setFotos(fotos.filter((_, i) => i !== index))} className="text-red-600 font-bold">X</button>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">Mínimo de 2 fotos</p>
+                      <textarea placeholder="Observação obrigatória" className="border p-2 w-full mt-2" value={observacao} onChange={(e) => setObservacao(e.target.value)} />
+                      <button onClick={() => checkOut(c.id)} className="bg-green-600 text-white px-2 py-1 rounded mt-2">
                         Check-out
                       </button>
                     </>
                   )}
-
-                  {status === 'concluido' && (
-                    <span className="text-green-600 font-bold mt-2 block">
-                      ✔ Concluído
-                    </span>
-                  )}
-
+                  {status === 'concluido' && <span className="text-green-600 font-bold mt-2 block">✔ Concluído</span>}
                 </li>
               )
             })}

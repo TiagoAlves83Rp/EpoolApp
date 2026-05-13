@@ -10,6 +10,7 @@ const supabaseAdmin = createClient(
 export async function POST(req: Request) {
   try {
     const body = await req.json()
+
     const { nome, email } = body
 
     // 🔒 validação
@@ -21,15 +22,17 @@ export async function POST(req: Request) {
     }
 
     // 🔥 BUSCAR PLANO PADRÃO (primeiro da tabela)
-    const { data: plano, error: planoError } = await supabaseAdmin
-      .from('planos')
-      .select('*')
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .single()
+    const { data: plano, error: planoError } =
+      await supabaseAdmin
+        .from('planos')
+        .select('*')
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .single()
 
     if (planoError || !plano) {
       console.error('Erro ao buscar plano:', planoError)
+
       return NextResponse.json(
         { error: 'Nenhum plano cadastrado no sistema' },
         { status: 400 }
@@ -37,7 +40,8 @@ export async function POST(req: Request) {
     }
 
     // 🔐 SENHA TEMPORÁRIA
-    const senhaTemp = Math.random().toString(36).slice(-8)
+    const senhaTemp =
+      Math.random().toString(36).slice(-8)
 
     // 🔍 VERIFICA SE EMAIL JÁ EXISTE
     const { data: existingUsers } =
@@ -64,10 +68,12 @@ export async function POST(req: Request) {
 
     if (userError || !userData.user) {
       console.error('Erro ao criar usuário:', userError)
+
       return NextResponse.json(
         {
           error:
-            userError?.message || 'Erro ao criar usuário'
+            userError?.message ||
+            'Erro ao criar usuário'
         },
         { status: 400 }
       )
@@ -77,7 +83,9 @@ export async function POST(req: Request) {
 
     // 📅 DATA DE VENCIMENTO (30 dias)
     const hoje = new Date()
+
     const vencimento = new Date()
+
     vencimento.setDate(hoje.getDate() + 30)
 
     // 🏢 CRIAR EMPRESA
@@ -89,13 +97,24 @@ export async function POST(req: Request) {
           email,
           plano_id: plano.id,
           status: 'ativa',
-          data_vencimento: vencimento.toISOString() // ✅ CORREÇÃO AQUI
+
+          // ✅ CORREÇÃO
+          data_vencimento: vencimento
+            .toISOString()
+            .split('T')[0]
         })
         .select()
         .single()
 
     if (empresaError || !empresa) {
-      console.error('Erro ao criar empresa:', empresaError)
+
+      console.error(
+        'Erro ao criar empresa:',
+        empresaError
+      )
+
+      // 🔥 REMOVE USER AUTH
+      await supabaseAdmin.auth.admin.deleteUser(userId)
 
       return NextResponse.json(
         {
@@ -109,15 +128,31 @@ export async function POST(req: Request) {
 
     // 👤 VINCULAR USUÁRIO COMO ADMIN
     const { error: usuarioError } =
-      await supabaseAdmin.from('usuarios').insert({
-        id: userId,
-        email,
-        tipo: 'admin',
-        empresa_id: empresa.id
-      })
+      await supabaseAdmin
+        .from('usuarios')
+        .insert({
+          id: userId,
+          email,
+          tipo: 'admin',
+          empresa_id: empresa.id
+        })
 
     if (usuarioError) {
-      console.error('Erro ao vincular usuário:', usuarioError)
+
+      console.error(
+        'Erro ao vincular usuário:',
+        usuarioError
+      )
+
+      // 🔥 REMOVE AUTH USER
+      await supabaseAdmin.auth.admin.deleteUser(userId)
+
+      // 🔥 REMOVE EMPRESA
+      await supabaseAdmin
+        .from('empresas')
+        .delete()
+        .eq('id', empresa.id)
+
       return NextResponse.json(
         { error: 'Erro ao vincular usuário' },
         { status: 400 }
@@ -132,7 +167,9 @@ export async function POST(req: Request) {
     })
 
   } catch (err) {
+
     console.error('Erro geral:', err)
+
     return NextResponse.json(
       { error: 'Erro interno do servidor' },
       { status: 500 }
