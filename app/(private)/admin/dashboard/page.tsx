@@ -115,13 +115,35 @@ export default function DashboardPage() {
     <div className="p-4 md:p-0">
       <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
 
-      {/* 💰 FINANCEIRO (TOPO) - Ajustado para grid responsivo */}
+      {/* 📅 FILTRO (PRIMEIRO) */}
+      <div className="flex flex-col md:flex-row gap-3 mb-6 bg-white p-4 rounded shadow">
+        <div className="flex-1">
+          <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Data Inicial</label>
+          <input
+            type="date"
+            value={dataInicial}
+            onChange={e => setDataInicial(e.target.value)}
+            className="border p-2 w-full rounded outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+          />
+        </div>
+        <div className="flex-1">
+          <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Data Final</label>
+          <input
+            type="date"
+            value={dataFinal}
+            onChange={e => setDataFinal(e.target.value)}
+            className="border p-2 w-full rounded outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+          />
+        </div>
+      </div>
+
+      {/* 💰 FINANCEIRO */}
       <div className="bg-white p-5 rounded shadow mb-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-bold">Financeiro</h2>
           <button
             onClick={toggleVisualizacao}
-            className="text-sm bg-gray-800 text-white px-3 py-1 rounded"
+            className="text-sm bg-gray-800 text-white px-3 py-1 rounded hover:bg-gray-700 transition-colors"
           >
             {visualizarValores ? '👁️ Ocultar' : '👁️ Mostrar'}
           </button>
@@ -134,31 +156,9 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 📅 FILTRO - Ajustado para empilhar no celular */}
-      <div className="flex flex-col md:flex-row gap-3 mb-6 bg-white p-4 rounded shadow">
-        <div className="flex-1">
-          <label className="text-xs block mb-1">Data Inicial</label>
-          <input
-            type="date"
-            value={dataInicial}
-            onChange={e => setDataInicial(e.target.value)}
-            className="border p-2 w-full"
-          />
-        </div>
-        <div className="flex-1">
-          <label className="text-xs block mb-1">Data Final</label>
-          <input
-            type="date"
-            value={dataFinal}
-            onChange={e => setDataFinal(e.target.value)}
-            className="border p-2 w-full"
-          />
-        </div>
-      </div>
+      {loading && <p className="mb-4 text-blue-600 font-medium">Carregando dados...</p>}
 
-      {loading && <p className="mb-4">Carregando...</p>}
-
-      {/* 📊 KPIs - Ajustado: 2 colunas no celular, 4 no desktop */}
+      {/* 📊 KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card titulo="Clientes Ativos" valor={dados.clientesAtivos} cor="bg-green-200" />
         <Card titulo="Clientes Inativos" valor={dados.clientesInativos} cor="bg-red-200" />

@@ -28,7 +28,9 @@ export default function ClientesPage() {
     valor_mensalidade: '',
     tipo_documento: 'CPF',
     documento: '',
-    status: 'ativo'
+    status: 'ativo',
+    frequencia: 'esporadico',
+    data_proxima_visita: ''
   })
 
   useEffect(() => {
@@ -68,7 +70,6 @@ export default function ClientesPage() {
     setErro('')
     if (c) {
       setEditando(c)
-      // Garantia de preenchimento dos campos para evitar inputs vazios
       setForm({
         nome: c.nome || '',
         telefone: c.telefone || '',
@@ -83,6 +84,8 @@ export default function ClientesPage() {
         tipo_documento: c.tipo_documento || 'CPF',
         documento: c.documento || '',
         status: c.status || 'ativo',
+        frequencia: c.frequencia || 'esporadico',
+        data_proxima_visita: c.data_proxima_visita ? c.data_proxima_visita.split('T')[0] : '',
         data_inicio: c.data_inicio ? c.data_inicio.split('T')[0] : '',
         data_ultimo_pagamento: c.data_ultimo_pagamento ? c.data_ultimo_pagamento.split('T')[0] : '',
         valor_mensalidade: c.valor_mensalidade 
@@ -94,7 +97,8 @@ export default function ClientesPage() {
       setForm({
         nome: '', telefone: '', endereco: '', numero: '', bairro: '', cep: '', cidade: '', uf: '',
         anotacoes: '', data_inicio: '', data_ultimo_pagamento: '', dia_vencimento: '',
-        valor_mensalidade: '', tipo_documento: 'CPF', documento: '', status: 'ativo'
+        valor_mensalidade: '', tipo_documento: 'CPF', documento: '', status: 'ativo',
+        frequencia: 'esporadico', data_proxima_visita: ''
       })
     }
     setModal(true)
@@ -118,8 +122,9 @@ export default function ClientesPage() {
     return v.replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d)/, '$1-$2').slice(0, 18)
   }
 
-  function moedaParaNumero(v: string) {
+  function moedaParaNumero(v: string | number) {
     if (!v) return 0
+    if (typeof v === 'number') return v
     return Number(v.replace(/\D/g, '')) / 100
   }
 
@@ -128,28 +133,44 @@ export default function ClientesPage() {
       setErro('Nome, Documento e Data de Início são obrigatórios')
       return
     }
+
+    if (form.frequencia !== 'esporadico' && !form.data_proxima_visita) {
+      setErro('Para visitas recorrentes, a data da próxima visita é obrigatória')
+      return
+    }
+
     setErro('')
     setLoading(true)
 
+    // CORREÇÃO CRÍTICA: Tratando strings vazias para evitar erro de sintaxe de data
     const payload = {
       ...form,
       empresa_id: empresaId,
-      dia_vencimento: Number(form.dia_vencimento),
-      valor_mensalidade: moedaParaNumero(form.valor_mensalidade)
+      dia_vencimento: Number(form.dia_vencimento) || 0,
+      valor_mensalidade: moedaParaNumero(form.valor_mensalidade),
+      // Se a string for vazia, mandamos null para o banco
+      data_proxima_visita: (!form.data_proxima_visita || form.frequencia === 'esporadico') ? null : form.data_proxima_visita,
+      data_inicio: !form.data_inicio ? null : form.data_inicio,
+      data_ultimo_pagamento: !form.data_ultimo_pagamento ? null : form.data_ultimo_pagamento
     }
 
     try {
       if (editando) {
-        await supabase.from('clientes').update(payload).eq('id', editando.id)
+        const { error } = await supabase.from('clientes').update(payload).eq('id', editando.id)
+        if (error) throw error
       } else {
-        await supabase.from('clientes').insert([payload])
+        const { error } = await supabase.from('clientes').insert([payload])
+        if (error) throw error
       }
+      
       await carregar()
       setModal(false)
+      setEditando(null)
     } catch (err: any) {
       setErro(err.message)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   return (
@@ -180,8 +201,8 @@ export default function ClientesPage() {
               <strong className="text-gray-800 text-lg block truncate">{c.nome}</strong>
               <span className="text-gray-500 text-sm block">{c.telefone}</span>
               <div className="flex gap-2 mt-1 items-center flex-wrap">
-                <span className="text-[11px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-medium">
-                  Venc. dia {c.dia_vencimento}
+                <span className="text-[11px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-bold uppercase">
+                  {c.frequencia}
                 </span>
                 <span className={`text-[11px] uppercase font-bold px-2 py-0.5 rounded-full ${c.status === 'ativo' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                   {c.status}
@@ -206,13 +227,39 @@ export default function ClientesPage() {
               <button onClick={() => setModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
             </div>
 
-            <div className="p-5 overflow-y-auto flex-1">
+            <div className="p-5 overflow-y-auto flex-1 text-left">
               {erro && <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm border border-red-100">{erro}</div>}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2 bg-blue-50 p-4 rounded-xl grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
+                  <div>
+                    <label className="text-xs font-bold text-blue-600 uppercase">Frequência de Visita *</label>
+                    <select 
+                      value={form.frequencia} 
+                      onChange={e => setForm({ ...form, frequencia: e.target.value })} 
+                      className="border p-2.5 w-full rounded-lg outline-none bg-white font-bold"
+                    >
+                      <option value="esporadico">Esporádico</option>
+                      <option value="semanal">Semanal</option>
+                      <option value="quinzenal">Quinzenal</option>
+                      <option value="mensal">Mensal</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-blue-600 uppercase">Próxima Visita</label>
+                    <input 
+                      type="date" 
+                      value={form.data_proxima_visita} 
+                      disabled={form.frequencia === 'esporadico'}
+                      onChange={e => setForm({ ...form, data_proxima_visita: e.target.value })} 
+                      className={`border p-2.5 w-full rounded-lg outline-none ${form.frequencia === 'esporadico' ? 'bg-gray-100 text-gray-400' : 'bg-white'}`} 
+                    />
+                  </div>
+                </div>
+
                 <div>
                   <label className="text-xs font-bold text-gray-500 uppercase">Data de Início *</label>
-                  <input type="date" value={form.data_inicio} onChange={e => setForm({ ...form, data_inicio: e.target.value })} className="border p-2.5 w-full rounded-lg focus:border-blue-500 outline-none" />
+                  <input type="date" value={form.data_inicio} onChange={e => setForm({ ...form, data_inicio: e.target.value })} className="border p-2.5 w-full rounded-lg outline-none" />
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   <div className="col-span-1">

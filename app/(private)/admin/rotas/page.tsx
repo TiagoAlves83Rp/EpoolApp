@@ -15,8 +15,8 @@ export default function RotasPage() {
 
   const [empresaId, setEmpresaId] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
+  const [modalNovo, setModalNovo] = useState(false)
 
-  // MODAL GLOBAL
   const [modalMsg, setModalMsg] = useState('')
   const [modalTipo, setModalTipo] = useState<'erro' | 'sucesso' | 'confirmar' | ''>('')
   const [acaoConfirmar, setAcaoConfirmar] = useState<null | (() => void)>(null)
@@ -47,9 +47,8 @@ export default function RotasPage() {
 
   async function carregarEmpresa() {
     const { data: userData } = await supabase.auth.getUser()
-    const user = userData.user
-    if (!user) return
-    const { data } = await supabase.from('usuarios').select('empresa_id').eq('id', user.id).single()
+    if (!userData.user) return
+    const { data } = await supabase.from('usuarios').select('empresa_id').eq('id', userData.user.id).single()
     setEmpresaId(data?.empresa_id)
   }
 
@@ -77,19 +76,39 @@ export default function RotasPage() {
   }
 
   async function salvar() {
-    if (!nome) return abrirErro('Informe o nome da rota')
+    const nomeLimpo = nome.trim()
+    if (!nomeLimpo) return abrirErro('Informe o nome da rota')
     if (!empresaId) return abrirErro('Empresa não identificada')
 
-    const { error } = await supabase.from('rotas').insert([{ nome, empresa_id: empresaId }])
-    if (error) return abrirErro('Erro ao criar rota')
+    setSalvando(true)
+
+    const { data: existente } = await supabase
+      .from('rotas')
+      .select('id')
+      .eq('empresa_id', empresaId)
+      .ilike('nome', nomeLimpo)
+
+    if (existente && existente.length > 0) {
+      setSalvando(false)
+      return abrirErro('Já existe uma rota com este nome!')
+    }
+
+    const { error } = await supabase.from('rotas').insert([{ nome: nomeLimpo, empresa_id: empresaId }])
+    
+    if (error) {
+      setSalvando(false)
+      return abrirErro('Erro ao criar rota')
+    }
 
     setNome('')
+    setModalNovo(false)
+    setSalvando(false)
     abrirSucesso('Rota criada com sucesso')
     carregarRotas()
   }
 
   function excluirRota(id: string) {
-    abrirConfirmacao('Deseja excluir esta rota permanentemente?', async () => {
+    abrirConfirmacao('Deseja excluir esta rota?', async () => {
       await supabase.from('rota_clientes').delete().eq('rota_id', id)
       await supabase.from('rotas').delete().eq('id', id)
       abrirSucesso('Rota excluída')
@@ -112,12 +131,13 @@ export default function RotasPage() {
   async function salvarDetalhes() {
     if (!rotaSelecionada || !funcionarioId) return abrirErro('Selecione um funcionário')
     if (clientesSelecionados.length === 0) return abrirErro('Selecione pelo menos um cliente')
-
+    
     setSalvando(true)
     try {
       await supabase.from('rota_clientes').delete().eq('rota_id', rotaSelecionada.id)
       await supabase.from('rota_clientes').insert(clientesSelecionados.map(id => ({ rota_id: rotaSelecionada.id, cliente_id: id })))
       await supabase.from('rotas').update({ funcionario_id: funcionarioId }).eq('id', rotaSelecionada.id)
+      
       abrirSucesso('Rota atualizada')
       setRotaSelecionada(null)
       carregarRotas()
@@ -128,149 +148,123 @@ export default function RotasPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-4">
+    <div className="p-4 max-w-4xl mx-auto">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Gerenciar Rotas</h1>
+        <h1 className="text-2xl font-bold text-gray-800">Rotas</h1>
+        <button
+          onClick={() => setModalNovo(true)}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition-all"
+        >
+          + Nova Rota
+        </button>
       </div>
 
-      {/* CARD DE CADASTRO */}
-      <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mb-8">
-        <label className="text-xs font-bold text-gray-500 uppercase mb-2 block">Nome da Nova Rota</label>
-        <div className="flex gap-3">
-          <input
-            value={nome}
-            onChange={(e) => setNome(e.target.value)}
-            placeholder="Ex: Rota Centro - Segunda"
-            className="border p-3 flex-1 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-          />
-          <button
-            onClick={salvar}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium transition-all shadow-md shadow-blue-100"
-          >
-            Cadastrar
-          </button>
-        </div>
-      </div>
-
-      {/* LISTAGEM */}
-      <div className="grid grid-cols-1 gap-3">
+      <div className="space-y-3">
         {rotas.map(r => (
-          <div key={r.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center hover:shadow-md transition-shadow">
+          <div key={r.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center">
             <div>
-              <strong className="text-gray-800 text-lg block">{r.nome}</strong>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-[11px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-medium">
-                  ID: {r.id.split('-')[0]}
-                </span>
-                <span className="text-xs text-gray-500">
-                  Responsável: <span className="font-semibold text-blue-600">{r.funcionarios?.nome || 'Pendente'}</span>
-                </span>
-              </div>
+              <strong className="text-gray-800">{r.nome}</strong>
+              <p className="text-xs text-gray-500 mt-1">
+                Funcionário: <span className="text-blue-600 font-medium">{r.funcionarios?.nome || 'Não definido'}</span>
+              </p>
             </div>
-
             <div className="flex gap-2">
               <button
                 onClick={() => abrirDetalhes(r)}
-                className="bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold px-4 py-2 rounded-lg text-sm transition-colors"
+                className="bg-blue-50 hover:bg-blue-100 text-blue-700 px-4 py-1.5 text-xs rounded-lg font-bold transition-all"
               >
-                Configurar
+                Detalhes
               </button>
               <button
                 onClick={() => excluirRota(r.id)}
-                className="bg-red-50 hover:bg-red-100 text-red-600 p-2 rounded-lg transition-colors"
-                title="Excluir"
+                className="bg-red-50 hover:bg-red-100 text-red-600 px-4 py-1.5 text-xs rounded-lg font-bold transition-all"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
+                Excluir
               </button>
             </div>
           </div>
         ))}
       </div>
 
-      {/* MODAL DE FEEDBACK (ERRO/SUCESSO/CONFIRMAR) */}
-      {modalTipo && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-          <div className="bg-white p-6 rounded-2xl w-full max-w-sm text-center shadow-2xl">
-            <div className={`w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center ${
-              modalTipo === 'erro' ? 'bg-red-100 text-red-600' : 
-              modalTipo === 'sucesso' ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'
-            }`}>
-              {modalTipo === 'erro' && '✕'}
-              {modalTipo === 'sucesso' && '✓'}
-              {modalTipo === 'confirmar' && '?'}
+      {/* MODAL NOVO */}
+      {modalNovo && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h2 className="text-lg font-bold text-gray-800">Cadastrar Rota</h2>
+              <button onClick={() => setModalNovo(false)} className="text-gray-400 text-2xl">&times;</button>
             </div>
-            <p className="text-gray-700 font-medium mb-6">{modalMsg}</p>
-
-            <div className="flex justify-center gap-3">
-              {modalTipo === 'confirmar' ? (
-                <>
-                  <button onClick={() => setModalTipo('')} className="px-6 py-2 rounded-lg bg-gray-100 text-gray-600 font-semibold">Cancelar</button>
-                  <button onClick={acaoConfirmar || (() => {})} className="px-6 py-2 rounded-lg bg-red-600 text-white font-semibold">Confirmar</button>
-                </>
-              ) : (
-                <button onClick={() => setModalTipo('')} className="px-10 py-2 rounded-lg bg-blue-600 text-white font-semibold shadow-md shadow-blue-100">OK</button>
-              )}
+            <div className="p-6">
+              <p className="text-xs font-bold text-gray-500 uppercase mb-1">Nome da rota</p>
+              <input
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                className="border p-2.5 w-full mb-6 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                placeholder="Ex: Rota Centro"
+              />
+              <div className="flex gap-3">
+                <button onClick={() => setModalNovo(false)} className="flex-1 bg-gray-100 text-gray-600 py-2 rounded-lg font-semibold">Cancelar</button>
+                <button onClick={salvar} disabled={salvando} className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-semibold disabled:opacity-50">
+                  {salvando ? 'Salvando...' : 'Salvar'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL DE DETALHES (EDIÇÃO DA ROTA) */}
+      {/* MODAL DETALHES */}
       {rotaSelecionada && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end md:items-center justify-center z-50 p-0 md:p-4">
-          <div className="bg-white w-full md:max-w-xl rounded-t-2xl md:rounded-2xl p-6 max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-gray-800">Configurar Rota: {rotaSelecionada.nome}</h2>
-              <button onClick={() => setRotaSelecionada(null)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto pr-2">
-              <label className="text-xs font-bold text-gray-500 uppercase mb-2 block">Funcionário Responsável</label>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-lg rounded-xl p-6 max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+            <h2 className="text-xl font-bold mb-4 text-gray-800">Editar: {rotaSelecionada.nome}</h2>
+            <div className="overflow-y-auto pr-1 flex-1">
+              <p className="text-xs font-bold text-gray-500 uppercase mb-1">Funcionário</p>
               <select
                 value={funcionarioId}
                 onChange={(e) => setFuncionarioId(e.target.value)}
-                className="border p-3 w-full mb-6 rounded-xl outline-none bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all"
+                className="border p-2.5 w-full mb-4 rounded-lg outline-none bg-white focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">Selecione um funcionário...</option>
+                <option value="">Selecione</option>
                 {funcionarios.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}
               </select>
-
-              <label className="text-xs font-bold text-gray-500 uppercase mb-2 block">Selecionar Clientes desta Rota</label>
-              <div className="grid grid-cols-1 gap-2 mb-4">
+              <p className="text-xs font-bold text-gray-500 uppercase mb-2">Clientes da Rota</p>
+              <div className="border border-gray-100 p-2 max-h-60 overflow-y-auto mb-6 rounded-lg bg-gray-50">
                 {clientes.map(c => (
-                  <label key={c.id} className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
-                    clientesSelecionados.includes(c.id) ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-100 hover:bg-gray-50'
-                  }`}>
+                  <label key={c.id} className="flex items-center gap-3 p-2 hover:bg-white rounded-md cursor-pointer transition-colors">
                     <input
                       type="checkbox"
                       checked={clientesSelecionados.includes(c.id)}
                       onChange={() => toggleCliente(c.id)}
-                      className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      className="w-4 h-4 rounded text-blue-600"
                     />
-                    <span className={`text-sm font-medium ${clientesSelecionados.includes(c.id) ? 'text-blue-800' : 'text-gray-700'}`}>
-                      {c.nome}
-                    </span>
+                    <span className="text-sm text-gray-700">{c.nome}</span>
                   </label>
                 ))}
               </div>
             </div>
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <button onClick={() => setRotaSelecionada(null)} className="bg-gray-100 text-gray-600 px-6 py-2 rounded-lg font-semibold">Fechar</button>
+              <button onClick={salvarDetalhes} disabled={salvando} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold disabled:opacity-50">Salvar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
-            <div className="mt-6 pt-4 border-t flex gap-3">
-              <button
-                onClick={() => setRotaSelecionada(null)}
-                className="flex-1 bg-gray-100 text-gray-600 px-4 py-3 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={salvarDetalhes}
-                disabled={salvando}
-                className="flex-[2] bg-blue-600 text-white px-4 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-all disabled:opacity-50 shadow-lg shadow-blue-100"
-              >
-                {salvando ? 'Processando...' : 'Salvar Alterações'}
-              </button>
+      {/* FEEDBACKS */}
+      {modalTipo && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <div className="bg-white p-6 rounded-xl w-full max-w-xs text-center shadow-2xl">
+            <p className={`mb-6 font-medium ${modalTipo === 'erro' ? 'text-red-600' : modalTipo === 'sucesso' ? 'text-green-600' : 'text-gray-800'}`}>{modalMsg}</p>
+            <div className="flex justify-center gap-3">
+              {modalTipo === 'confirmar' ? (
+                <>
+                  <button onClick={() => setModalTipo('')} className="bg-gray-100 text-gray-600 px-6 py-2 rounded-lg font-semibold">Não</button>
+                  <button onClick={acaoConfirmar || (() => {})} className="bg-red-600 text-white px-6 py-2 rounded-lg font-semibold">Sim</button>
+                </>
+              ) : (
+                <button onClick={() => setModalTipo('')} className="bg-blue-600 text-white px-10 py-2 rounded-lg font-semibold">OK</button>
+              )}
             </div>
           </div>
         </div>

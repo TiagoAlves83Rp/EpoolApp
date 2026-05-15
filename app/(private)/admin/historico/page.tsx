@@ -4,10 +4,13 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 
 export default function HistoricoPage() {
+  // --- LÓGICA PARA DATA DE HOJE COMO DEFAULT ---
+  const hoje = new Date().toISOString().split('T')[0]
+
   const [empresaId, setEmpresaId] = useState<string | null>(null)
   const [registros, setRegistros] = useState<any[]>([])
-  const [dataInicial, setDataInicial] = useState('')
-  const [dataFinal, setDataFinal] = useState('')
+  const [dataInicial, setDataInicial] = useState(hoje) // Default Hoje
+  const [dataFinal, setDataFinal] = useState(hoje)     // Default Hoje
   const [clienteBusca, setClienteBusca] = useState('')
   const [funcionarioBusca, setFuncionarioBusca] = useState('')
   const [loading, setLoading] = useState(false)
@@ -102,7 +105,7 @@ export default function HistoricoPage() {
 
       {/* LISTA COMPACTA COM DROPDOWN */}
       <div className="space-y-2">
-        {registros.length === 0 && <div className="bg-white p-6 rounded shadow text-center text-gray-500">Nenhum registro encontrado</div>}
+        {registros.length === 0 && <div className="bg-white p-6 rounded shadow text-center text-gray-500">Nenhum registro encontrado para este período</div>}
         
         {registros.map((r) => {
           const isExpandido = expandidos.includes(r.id);
